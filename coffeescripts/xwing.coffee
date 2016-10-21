@@ -267,6 +267,7 @@ class exportObj.SquadBuilder
                 <div class="html-list">
                     <textarea></textarea><button class="btn btn-copy">Copy</button>
                 </div>
+                <div class="tts-list"></div>
             </div>
             <div class="modal-footer hidden-print">
                 <label class="vertical-space-checkbox">
@@ -286,6 +287,7 @@ class exportObj.SquadBuilder
                     <button class="btn select-fancy-view hidden-phone">Fancy</button>
                     <button class="btn select-bbcode-view">BBCode</button>
                     <button class="btn select-html-view">HTML</button>
+                    <button class="btn select-tts-view hidden-phone">Tabletop Simulator</button>
                 </div>
                 <button class="btn print-list hidden-phone"><i class="icon-print"></i>&nbsp;Print</button>
                 <button class="btn close-print-dialog" data-dismiss="modal" aria-hidden="true">Close</button>
@@ -300,6 +302,7 @@ class exportObj.SquadBuilder
         @htmlview_container = $ @list_modal.find('div.modal-body .html-list')
         @html_textarea = $ @htmlview_container.find('textarea')
         @html_textarea.attr 'readonly', 'readonly'
+        @tts_container = $ @list_modal.find('div.modal-body .tts-list')
         @toggle_vertical_space_container = $ @list_modal.find('.vertical-space-checkbox')
         @toggle_color_print_container = $ @list_modal.find('.color-print-checkbox')
 
@@ -372,6 +375,20 @@ class exportObj.SquadBuilder
                 @html_textarea.focus()
                 @toggle_vertical_space_container.show()
                 @toggle_color_print_container.show()
+
+        @select_tts_view_button = $ @list_modal.find('.select-tts-view')
+        @select_tts_view_button.click (e) =>
+            @select_tts_view_button.blur()
+            unless @list_display_mode == 'tts'
+                @list_modal.find('.list-display-mode .btn').removeClass 'btn-inverse'
+                @select_tts_view_button.addClass 'btn-inverse'
+                @list_display_mode = 'tts'
+                @tts_container.show()
+                @fancy_container.hide()
+                @bbcode_container.hide()
+                @htmlview_container.hide()
+                @toggle_vertical_space_container.hide()
+                @toggle_color_print_container.hide()
 
         if $(window).width() >= 768
             @simple_container.hide()
@@ -753,6 +770,8 @@ class exportObj.SquadBuilder
             switch @list_display_mode
                 when 'simple'
                     @printable_container.find('.printable-body').html @simple_container.html()
+                when 'tts'
+                    @printable_container.find('.printable-body').html @tts_container.html()
                 else
                     for ship in @ships
                         @printable_container.find('.printable-body').append ship.toHTML() if ship.pilot?
@@ -916,12 +935,14 @@ class exportObj.SquadBuilder
         # and text list
         @fancy_container.text ''
         @simple_container.html '<table class="simple-table"></table>'
+        @tts_container.text ''
         bbcode_ships = []
         htmlview_ships = []
         for ship in @ships
             if ship.pilot?
                 @fancy_container.append ship.toHTML()
                 @simple_container.find('table').append ship.toTableRow()
+                @tts_container.append ship.toTTS()
                 bbcode_ships.push ship.toBBCode()
                 htmlview_ships.push ship.toSimpleHTML()
         @htmlview_container.find('textarea').val $.trim """#{htmlview_ships.join '<br />'}
@@ -2334,6 +2355,22 @@ class Ship
 
         html
 
+    toTTS: ->
+        text = "#{@pilot.name} "
+        total_points = @pilot.points
+
+        slotted_upgrades = (upgrade for upgrade in @upgrades when upgrade.data?)
+            .concat (modification for modification in @modifications when modification.data?)
+        slotted_upgrades.push @title if @title?.data?
+        if slotted_upgrades.length > 0
+            for upgrade in slotted_upgrades
+                total_points += upgrade.getPoints()
+                upgrade_text = upgrade.toTTS()
+                text += upgrade_text if upgrade_text?
+
+        text += "(#{total_points}) <br/>"
+        text
+
     toSerialized: ->
         # PILOT_ID:UPGRADEID1,UPGRADEID2:TITLEID:MODIFICATIONID:CONFERREDADDONTYPE1.CONFERREDADDONID1,CONFERREDADDONTYPE2.CONFERREDADDONID2
 
@@ -2870,6 +2907,12 @@ class GenericAddon
     toSimpleHTML: ->
         if @data?
             """<i>#{@data.name} (#{@data.points})</i><br />"""
+        else
+            ''
+
+    toTTS: ->
+        if @data?
+            "+ #{@data.name} "
         else
             ''
 
